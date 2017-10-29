@@ -1,0 +1,60 @@
+version: '2'
+services:
+  books_service:
+    build:
+      context: .
+      dockerfile: Dockerfile_books_service
+    networks:
+      mymesh:
+        aliases:
+          - books_service
+    expose:
+      - "9000"
+
+  reviews_service:
+    build:
+      context: .
+      dockerfile: Dockerfile_reviews_service
+    networks:
+      mymesh:
+        aliases:
+          - reviews_service
+    expose:
+      - "9100"
+
+  books_envoy_proxy:
+    build:
+      context: ../
+      dockerfile: envoy-test/Dockerfile_books_envoy
+    volumes:
+      - ./books_envoy.json:/etc/books_envoy.json
+    networks:
+      mymesh:
+        aliases:
+          - books_envoy_proxy
+    expose:
+      - "10000"
+      - "10001"
+    ports:
+      - "10000:10000"
+      - "10001:10001"
+
+  reviews_envoy_proxy:
+    build:
+      context: ../
+      dockerfile: envoy-test/Dockerfile_reviews_envoy
+    volumes:
+      - ./reviews_envoy.json:/etc/reviews_envoy.json
+    networks:
+      mymesh:
+        aliases:
+          - reviews_envoy_proxy
+    expose:
+      - "10100"
+      - "10101"
+    ports:
+      - "10100:10100"
+      - "10101:10101"
+
+networks:
+  mymesh: {}

@@ -1,0 +1,5 @@
+FROM store/oracle/serverjre:8
+WORKDIR /app
+ADD ./reviews-service/target/reviews-service-0.1.0-SNAPSHOT.jar /app/reviews-service.jar
+EXPOSE 9100
+CMD java -cp /app/reviews-service.jar test.envoy.reviews.ReviewsServiceBootstrap -port=9100

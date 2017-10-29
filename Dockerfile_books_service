@@ -1,0 +1,7 @@
+FROM store/oracle/serverjre:8
+WORKDIR /app
+ADD ./books-service/target/books-service-0.1.0-SNAPSHOT.jar /app/books-service.jar
+EXPOSE 9000
+# CMD ["java", "-jar", "/app/books-service.jar", "-port=9000"]
+# CMD ["java", "-cp /app/books-service.jar", "test.envoy.books.BooksServiceBootstrap", "-port=9000"]
+CMD java -cp /app/books-service.jar test.envoy.books.BooksServiceBootstrap -port=9000
