@@ -1,7 +1,7 @@
 package test.envoy.books;
 
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.http.HttpClientRequest;
@@ -43,13 +43,30 @@ public class BooksServiceBootstrap {
                 .setDefaultPort(9999);
         this.sdsClient = this.vertx.createHttpClient(options);
 
-        this.registerInSDS();
-
         //Client to call out to reviews service at port 10010
         options = new HttpClientOptions()
                 .setDefaultHost("0.0.0.0")
                 .setDefaultPort(10010);
         this.reviewsClient = this.vertx.createHttpClient(options);
+
+        boolean isSuccessful = this.startApiServer()
+                .compose(v -> this.registerInSDS())
+                .isComplete();
+
+        if(!isSuccessful) {
+            logger.info("Unable to start books service. Exiting...");
+            System.exit(-1);
+        }
+
+        try {
+            logger.info("Started books service on host:{}, port: {}", InetAddress.getLocalHost().getHostAddress(), this.port);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private Future<Void> startApiServer() {
+        Future<Void> future = Future.future();
 
         Router router = Router.router(vertx);
         router.route().handler(BodyHandler.create());
@@ -59,25 +76,28 @@ public class BooksServiceBootstrap {
         router.get("/v1/books").handler(this::findAllBooks);
         router.get("/v1/books/reviews").handler(this::findAllBooksWithReviews);
 
-        vertx.createHttpServer().requestHandler(router::accept).listen(this.port);
-
         try {
-            logger.info("Started books service on host:{}, port: {}", InetAddress.getLocalHost().getHostAddress(), this.port);
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
+            vertx.createHttpServer().requestHandler(router::accept).listen(this.port);
+            future.complete();
+        } catch (Exception ex) {
+            future.fail(ex);
         }
+        return future;
     }
 
-    private void registerInSDS() {
+    private Future<Void> registerInSDS() {
+        Future<Void> future = Future.future();
         try {
             String ipAddress = InetAddress.getLocalHost().getHostAddress();
             HttpClientRequest request = this.sdsClient.post("/v1/registration/books-service", rh -> {
+                logger.info("Registration request came back with status code: {}", rh.statusCode());
                 if(rh.statusCode() != 201) {
                     logger.info("Registration failed: {}", rh.statusCode());
-                    throw new RuntimeException("Unable to register in SDS");
+                    future.fail("Unable to register books-service");
                 }
                 rh.bodyHandler(buffer -> {
                     logger.info("Registration succeeded: {}, {}", rh.statusCode(), buffer);
+                    future.complete();
                 });
             });
             JsonObject payload = new JsonObject();
@@ -87,12 +107,17 @@ public class BooksServiceBootstrap {
 
             request.putHeader("content-length", payload.encode().length()+"");
             request.putHeader("content-type", "application/json");
+            request.exceptionHandler(exception -> {
+                logger.error("Unable to reach SDS server: {}", exception);
+                future.fail(exception);
+            });
             request.end(payload.encode());
             logger.info("Registration sent to SDS");
         } catch (Exception ex) {
             logger.info("Unable to register in SDS, shutting down: {}", ex);
-            System.exit(-1);
+            future.fail(ex);
         }
+        return future;
     }
 
     private void handlePing(RoutingContext routingContext) {
@@ -102,11 +127,16 @@ public class BooksServiceBootstrap {
 
     private void findAllBooks(RoutingContext routingContext) {
         logger.info("Finding all books...");
-        JsonObject book = new JsonObject();
-        book.put("id", "1").put("name", "Gita").put("author", "Vyasa");
-        JsonArray books = new JsonArray();
-        books.add(book);
-        routingContext.response().end(books.encodePrettily());
+        Boolean includeReviews = Boolean.valueOf(routingContext.request().getParam("includeReviews"));
+        if(includeReviews) {
+            this.findAllBooksWithReviews(routingContext);
+        } else {
+            JsonObject book = new JsonObject();
+            book.put("id", "1").put("name", "Gita").put("author", "Vyasa");
+            JsonArray books = new JsonArray();
+            books.add(book);
+            routingContext.response().end(books.encodePrettily());
+        }
     }
 
     private void findAllBooksWithReviews(RoutingContext routingContext) {
