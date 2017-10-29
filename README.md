@@ -25,9 +25,11 @@ To run the docker images:
 
 ```
 docker run -d -p10000:10000 -p10001:100001 books-service
-docker run -d -p10100:10100 -p10101:101001 books-service
+docker run -d -p10100:10100 -p10101:101001 reviews-service
 ```
 
-This is the topology and flow diagram at a high level
+This is the topology and flow diagram at a high level.
+
+Note that the vertx servers register themselves to the sds_service during the bootstrap
 
 ![alt text](./s2s-diagram.png?raw=true "topology")
