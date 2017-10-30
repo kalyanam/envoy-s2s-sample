@@ -49,20 +49,20 @@ public class BooksServiceBootstrap {
                 .setDefaultPort(10010);
         this.reviewsClient = this.vertx.createHttpClient(options);
 
-        boolean isSuccessful = this.startApiServer()
+        this.startApiServer()
                 .compose(v -> this.registerInSDS())
-                .isComplete();
-
-        if(!isSuccessful) {
-            logger.info("Unable to start books service. Exiting...");
-            System.exit(-1);
-        }
-
-        try {
-            logger.info("Started books service on host:{}, port: {}", InetAddress.getLocalHost().getHostAddress(), this.port);
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        }
+                .setHandler(res -> {
+                    if(res.succeeded()) {
+                        try {
+                            logger.info("Started books service on host:{}, port: {}", InetAddress.getLocalHost().getHostAddress(), this.port);
+                        } catch (UnknownHostException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        logger.error("Unable to start books-service. Shutting down: {}", res.cause());
+                        System.exit(-1);
+                    }
+                });
     }
 
     private Future<Void> startApiServer() {
@@ -78,6 +78,7 @@ public class BooksServiceBootstrap {
 
         try {
             vertx.createHttpServer().requestHandler(router::accept).listen(this.port);
+            logger.info("Started the api server");
             future.complete();
         } catch (Exception ex) {
             future.fail(ex);
