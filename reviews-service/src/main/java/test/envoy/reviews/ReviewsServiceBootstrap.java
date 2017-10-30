@@ -1,5 +1,6 @@
 package test.envoy.reviews;
 
+import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpClientOptions;
@@ -42,16 +43,20 @@ public class ReviewsServiceBootstrap {
                 .setDefaultPort(9999);
         this.sdsClient = this.vertx.createHttpClient(options);
 
-        this.registerInSDS();
-
-        Router router = Router.router(vertx);
-        router.route().handler(BodyHandler.create());
-        router.route().handler(CorsHandler.create("*"));
-
-        router.get("/ping").handler(this::handlePing);
-        router.get("/v1/reviews").handler(this::findAllReviews);
-
-        vertx.createHttpServer().requestHandler(router::accept).listen(this.port);
+        this.startApiServer()
+                .compose(v -> this.registerInSDS())
+                .setHandler(res -> {
+                    if(res.succeeded()) {
+                        try {
+                            logger.info("Started reviews service on host:{}, port: {}", InetAddress.getLocalHost().getHostAddress(), this.port);
+                        } catch (UnknownHostException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        logger.error("Unable to start reviews-service. Shutting down: {}", res.cause());
+                        System.exit(-1);
+                    }
+                });
 
         try {
             logger.info("Started reviews service on host:{}, port: {}", InetAddress.getLocalHost().getHostAddress(), this.port);
@@ -60,16 +65,38 @@ public class ReviewsServiceBootstrap {
         }
     }
 
-    private void registerInSDS() {
+    private Future<Void> startApiServer() {
+        Router router = Router.router(vertx);
+        router.route().handler(BodyHandler.create());
+        router.route().handler(CorsHandler.create("*"));
+
+        router.get("/ping").handler(this::handlePing);
+        router.get("/v1/reviews").handler(this::findAllReviews);
+
+        Future<Void> future = Future.future();
+        try {
+            vertx.createHttpServer().requestHandler(router::accept).listen(this.port);
+            future.complete();
+        } catch (Exception ex) {
+            logger.error("Unable to start the api server: {}", ex);
+            future.fail(ex);
+        }
+
+        return future;
+    }
+
+    private Future<Void>  registerInSDS() {
+        Future<Void> future = Future.future();
         try {
             String ipAddress = InetAddress.getLocalHost().getHostAddress();
             HttpClientRequest request = this.sdsClient.post("/v1/registration/reviews-service", rh -> {
                 if(rh.statusCode() != 201) {
                     logger.info("Registration failed: {}", rh.statusCode());
-                    throw new RuntimeException("Unable to register in SDS");
+                    future.fail("Unable to register in SDS");
                 }
                 rh.bodyHandler(buffer -> {
                     logger.info("Registration succeeded: {}, {}", rh.statusCode(), buffer);
+                    future.complete();
                 });
             });
             JsonObject payload = new JsonObject();
@@ -82,9 +109,10 @@ public class ReviewsServiceBootstrap {
             request.end(payload.encode());
             logger.info("Registration sent to SDS");
         } catch (Exception ex) {
-            logger.info("Unable to register in SDS, shutting down: {}", ex);
-            System.exit(-1);
+            logger.info("Unable to register in SDS: {}", ex);
+            future.fail(ex);
         }
+        return future;
     }
 
     private void handlePing(RoutingContext routingContext) {

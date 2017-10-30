@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -48,10 +47,7 @@ public class SDSBootstrap {
         router.get("/v1/registration/:serviceName").handler(this::findEndpoints);
         router.post("/v1/registration/:serviceName").handler(this::saveEndpoint);
 
-        router.get("/v1/admin/registration").handler(rc -> {
-            Map<?, ?> endpoints = this.endpointStore.getAllEndpoints();
-            rc.response().end(Json.encodePrettily(endpoints));
-        });
+        router.get("/admin/v1/registration").handler(this::findAllEndpoints);
 
         router.get("/*").handler(rc -> {
             logger.info("Request is: {}", rc.request().path());
@@ -65,6 +61,11 @@ public class SDSBootstrap {
         } catch (UnknownHostException e) {
             e.printStackTrace();
         }
+    }
+
+    private void findAllEndpoints(RoutingContext routingContext) {
+        Map<?, ?> endpoints = this.endpointStore.getAllEndpoints();
+        routingContext.response().end(Json.encodePrettily(endpoints));
     }
 
     private void handlePing(RoutingContext routingContext) {
