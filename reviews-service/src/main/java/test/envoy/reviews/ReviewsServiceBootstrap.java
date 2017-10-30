@@ -19,9 +19,6 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-/**
- * Created by mkalyan on 10/26/17.
- */
 public class ReviewsServiceBootstrap {
     private static final Logger logger = LoggerFactory.getLogger(ReviewsServiceBootstrap.class);
 

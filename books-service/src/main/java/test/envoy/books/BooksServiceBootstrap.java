@@ -19,9 +19,6 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-/**
- * Created by mkalyan on 10/26/17.
- */
 public class BooksServiceBootstrap {
     private static final Logger logger = LoggerFactory.getLogger(BooksServiceBootstrap.class);
 
@@ -33,6 +30,9 @@ public class BooksServiceBootstrap {
     private Vertx vertx;
     private HttpClient sdsClient;
     private HttpClient reviewsClient;
+
+    //Dummy data provider
+    private BooksRepository booksRepository = new BooksRepository();
 
     private void start() {
         this.vertx = Vertx.vertx();
@@ -132,11 +132,7 @@ public class BooksServiceBootstrap {
         if(includeReviews) {
             this.findAllBooksWithReviews(routingContext);
         } else {
-            JsonObject book = new JsonObject();
-            book.put("id", "1").put("name", "Gita").put("author", "Vyasa");
-            JsonArray books = new JsonArray();
-            books.add(book);
-            routingContext.response().end(books.encodePrettily());
+            routingContext.response().end(booksRepository.findAllBooks().encodePrettily());
         }
     }
 
@@ -153,10 +149,7 @@ public class BooksServiceBootstrap {
 
             responseHandler.bodyHandler(buffer -> {
                 logger.info("Response is: {}", buffer.toString());
-                JsonObject book = new JsonObject();
-                book.put("id", "1")
-                        .put("name", "Gita")
-                        .put("author", "Vyasa")
+                JsonObject book = booksRepository.findAnyBook()
                         .put("reviews", new JsonArray(buffer.toString()));
                 JsonArray books = new JsonArray();
                 books.add(book);

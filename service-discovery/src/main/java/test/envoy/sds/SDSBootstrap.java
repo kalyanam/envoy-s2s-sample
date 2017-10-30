@@ -18,9 +18,6 @@ import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Created by mkalyan on 10/27/17.
- */
 public class SDSBootstrap {
     private static final Logger logger = LoggerFactory.getLogger(SDSBootstrap.class);
 
